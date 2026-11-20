@@ -12,21 +12,21 @@ public class Day7 {
         Computer[] computers = new Computer[n];
         Thread[] threads = new Thread[n];
 
-        BlockingQueue<Integer> initial_input = new LinkedBlockingQueue<>();
-        initial_input.put(phase_settings[0]);
-        initial_input.put(start_signal);
+        BlockingQueue<Long> initial_input = new LinkedBlockingQueue<>();
+        initial_input.put(1L * phase_settings[0]);
+        initial_input.put(1L * start_signal);
 
-        BlockingQueue<Integer> input_queue = null;
+        BlockingQueue<Long> input_queue = null;
 
         for (int i = 0; i < n; i++) {
             if (input_queue == null)
                 input_queue = initial_input;
 
-            BlockingQueue<Integer> output_queue = null;
+            BlockingQueue<Long> output_queue = null;
 
             if (i + 1 < n) {
                 output_queue = new LinkedBlockingQueue<>();
-                output_queue.put(phase_settings[i + 1]);
+                output_queue.put(1L * phase_settings[i + 1]);
             } else {
                 output_queue = initial_input;
             }
@@ -41,7 +41,8 @@ public class Day7 {
         for (Thread t : threads)
             t.join();
 
-        return computers[n - 1].output_history.getLast();
+        long ans = computers[n - 1].output_history.getLast();
+        return (int) ans;
     }
 
     public static int permute (int offs, int[] setting, boolean[] used, int i, String program) throws InterruptedException{

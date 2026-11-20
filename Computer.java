@@ -6,19 +6,19 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 
-
-enum Mode { POSITIONAL, IMMEDIATE }
-record Argument (int value, Mode mode) {}
+enum Mode { POSITIONAL, IMMEDIATE, RELATIVE }
+record Argument (long value, Mode mode) {}
 record Instruction(int code, List<Argument> args ) {}
 
 public class Computer implements Runnable {
-    private final int size;
-    private final int[] init;
-    private int[] memory;
+    private static final int size = 100_000;
+    private final long[] init;
+    private long[] memory;
     private Scanner scanner;
 
-    public List<Integer> input_history, output_history;
-    public BlockingQueue<Integer> input_queue, output_queue;
+    private int rbase;
+    public List<Long> input_history, output_history;
+    public BlockingQueue<Long> input_queue, output_queue;
     private final Map<Integer, Integer> arg_count = new HashMap<>(Map.of(
         1, 3, 
         2, 3, 
@@ -28,23 +28,26 @@ public class Computer implements Runnable {
         6, 2,
         7, 3,
         8, 3,
+        9, 1,
         99, 0
     ));
 
     public Computer(String instruction) {
         String[] tokens = instruction.split(",");
+        if (tokens.length > size)
+            throw new RuntimeException("Need to increase size!");
 
-        size = tokens.length;
-        init = new int[size];
-        memory = new int[size];
+        init = new long[size];
+        memory = new long[size];
+        rbase = 0;
 
         input_history = new ArrayList<>();
         output_history = new ArrayList<>();
 
-        for (int i = 0; i < size; i++)
-            init[i] = Integer.parseInt(tokens[i]);
+        for (int i = 0; i < tokens.length; i++)
+            init[i] = Long.parseLong(tokens[i]);
     
-        Arrays.fill(memory, 0);
+        Arrays.fill(memory, 0L);
     }
 
     public Computer(String instruction, Scanner scanner) {
@@ -69,7 +72,7 @@ public class Computer implements Runnable {
         }
     }
 
-    public void run(int noun, int verb) {
+    public void run(long noun, long verb) {
         memory = Arrays.copyOf(init, size);
         memory[1] = noun;
         memory[2] = verb;
@@ -82,18 +85,38 @@ public class Computer implements Runnable {
         }
     }
 
-    public int read(int addr) {
+    public long read(int addr) {
         return memory[addr];
     }
 
-    private int resolve(Argument arg) {
-        return arg.mode() == Mode.POSITIONAL ? memory[arg.value()] : arg.value();
+    private long resolve(Argument arg) {
+        return switch(arg.mode()) {
+            case Mode.POSITIONAL -> memory[(int) arg.value()];
+            case Mode.IMMEDIATE -> arg.value();
+            case Mode.RELATIVE -> memory[rbase + (int) arg.value()];
+            default -> throw new RuntimeException("Invalid mode for resolution");
+        };
     }
 
-    private void write (Argument arg, int value) {
-        if (arg.mode() != Mode.POSITIONAL)
-            throw new RuntimeException("cant have immediate address!");
-        memory[arg.value()] = value;
+    private void write (Argument arg, long value) {
+        long addr = switch(arg.mode()) {
+            case Mode.POSITIONAL -> arg.value();
+            case Mode.RELATIVE -> rbase + arg.value();
+            default -> throw new RuntimeException("Cannot write in " + arg.mode().name() + "!");
+        };
+
+        if (addr < 0L || addr >= 1L * size)
+            throw new RuntimeException("Invalid address!");
+
+        memory[(int) addr] = value;
+    }
+
+    private int _adjust_rbase(Instruction inst, int ip) {
+        Argument arg1 = inst.args().get(0);
+
+        long val1 = resolve(arg1);
+        rbase += (int) val1;
+        return ip + 1 + inst.args().size();
     }
 
     private int _multiply(Instruction inst, int ip) {
@@ -101,7 +124,7 @@ public class Computer implements Runnable {
                  arg2 = inst.args().get(1),
                  arg3 = inst.args().get(2);
 
-        int val1 = resolve(arg1), val2 = resolve(arg2);
+        long val1 = resolve(arg1), val2 = resolve(arg2);
         write(arg3, val1 * val2);
         return ip + 1 + inst.args().size();
     }
@@ -111,19 +134,19 @@ public class Computer implements Runnable {
                  arg2 = inst.args().get(1),
                  arg3 = inst.args().get(2);
 
-        int val1 = resolve(arg1), val2 = resolve(arg2);
+        long val1 = resolve(arg1), val2 = resolve(arg2);
         write(arg3, val1 + val2);
         return ip + 1 + inst.args().size();
     }
 
     private int _in(Instruction inst, int ip) throws InterruptedException {
         Argument arg1 = inst.args().get(0);
-        int num = 0;
+        long num = 0;
 
         if (input_queue instanceof BlockingQueue) {
             num = input_queue.take();
         } else if (scanner instanceof Scanner) {
-            num = scanner.nextInt(); 
+            num = scanner.nextLong(); 
         } else {
             throw new RuntimeException("input not configured!");
         }
@@ -135,7 +158,7 @@ public class Computer implements Runnable {
 
     private int _out(Instruction inst, int ip) throws InterruptedException {
         Argument arg1 = inst.args().get(0);
-        int val1 = resolve(arg1);
+        long val1 = resolve(arg1);
 
         if (output_queue instanceof BlockingQueue) {
             output_queue.put(val1);
@@ -150,12 +173,12 @@ public class Computer implements Runnable {
     private int _jump(Instruction inst, int ip, boolean zero) {
         Argument arg1 = inst.args().get(0),
                  arg2 = inst.args().get(1);
-        int val1 = resolve(arg1), val2 = resolve(arg2);
+        long val1 = resolve(arg1), val2 = resolve(arg2);
 
-        if (!zero && val1 != 0)
-            return val2;
+        if (!zero && val1 != 0L)
+            return (int) val2;
         if (zero && val1 == 0)
-            return val2;
+            return (int) val2;
 
         return ip + 1 + inst.args().size();
     }
@@ -164,8 +187,8 @@ public class Computer implements Runnable {
         Argument arg1 = inst.args().get(0),
                  arg2 = inst.args().get(1),
                  arg3 = inst.args().get(2);
-        int val1 = resolve(arg1), val2 = resolve(arg2);
-        int val3 = val1 < val2 ? 1 : 0;
+        long val1 = resolve(arg1), val2 = resolve(arg2);
+        long val3 = val1 < val2 ? 1L : 0L;
 
         write(arg3, val3);
         return ip + 1 + inst.args().size();
@@ -175,23 +198,26 @@ public class Computer implements Runnable {
         Argument arg1 = inst.args().get(0),
                  arg2 = inst.args().get(1),
                  arg3 = inst.args().get(2);
-        int val1 = resolve(arg1), val2 = resolve(arg2);
-        int val3 = val1 == val2 ? 1 : 0;
+        long val1 = resolve(arg1), val2 = resolve(arg2);
+        long val3 = val1 == val2 ? 1L : 0L;
 
         write(arg3, val3);
         return ip + 1 + inst.args().size();    
     }
 
     private Instruction read_command(int ip) {
-        int code = memory[ip] % 100;
-        int mode = memory[ip] / 100;
+        int code = (int) memory[ip] % 100;
+        int mode = (int) memory[ip] / 100;
         int num_args = arg_count.get(code);
         List<Argument> args = new ArrayList<>();
 
         for (int i = 0; i < num_args; i++) {
-            Mode m = mode % 10 == 0 
-                ? Mode.POSITIONAL 
-                : Mode.IMMEDIATE;
+            Mode m = switch(mode % 10) {
+                case 0 -> Mode.POSITIONAL;
+                case 1 -> Mode.IMMEDIATE;
+                case 2 -> Mode.RELATIVE;
+                default -> throw new RuntimeException("invalid mode");
+            };
             args.add(new Argument(memory[ip + 1 + i], m));
             mode /= 10;
         }
@@ -209,6 +235,7 @@ public class Computer implements Runnable {
             case 6 -> _jump(inst, ip, true);
             case 7 -> _le(inst, ip);
             case 8 -> _eq(inst, ip);
+            case 9 -> _adjust_rbase(inst, ip);
             case 4 -> _out(inst, ip);
             case 99 -> -1;
             default -> throw new RuntimeException("invalid opcode");
