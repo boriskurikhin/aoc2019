@@ -1,6 +1,0 @@
-/**
- * Point
- */
-public class Point {
-
-}
