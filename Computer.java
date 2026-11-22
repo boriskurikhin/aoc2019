@@ -11,7 +11,7 @@ record Argument (long value, Mode mode) {}
 record Instruction(int code, List<Argument> args ) {}
 
 public class Computer implements Runnable {
-    private static final int size = 100_000;
+    private static final int size = 10_000;
     private final long[] init;
     private long[] memory;
     private Scanner scanner;
