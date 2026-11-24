@@ -16,6 +16,8 @@ public class Computer implements Runnable {
     private long[] memory;
     private Scanner scanner;
 
+    public static final long HALT = Long.MIN_VALUE;
+
     private int rbase;
     public List<Long> input_history, output_history;
     public BlockingQueue<Long> input_queue, output_queue;
@@ -69,6 +71,9 @@ public class Computer implements Runnable {
             do { ip = run_command(ip); } while (ip != -1);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        } finally {
+            if (output_queue != null)
+                output_queue.add(HALT);
         }
     }
 
@@ -82,6 +87,9 @@ public class Computer implements Runnable {
             do { ip = run_command(ip); } while (ip != -1);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        } finally {
+            if (output_queue != null)
+                output_queue.add(HALT);
         }
     }
 
@@ -143,9 +151,9 @@ public class Computer implements Runnable {
         Argument arg1 = inst.args().get(0);
         long num = 0;
 
-        if (input_queue instanceof BlockingQueue) {
+        if (input_queue != null) {
             num = input_queue.take();
-        } else if (scanner instanceof Scanner) {
+        } else if (scanner != null) {
             num = scanner.nextLong(); 
         } else {
             throw new RuntimeException("input not configured!");
@@ -160,7 +168,7 @@ public class Computer implements Runnable {
         Argument arg1 = inst.args().get(0);
         long val1 = resolve(arg1);
 
-        if (output_queue instanceof BlockingQueue) {
+        if (output_queue != null) {
             output_queue.put(val1);
         } else {
             System.out.println(val1);
@@ -231,12 +239,12 @@ public class Computer implements Runnable {
             case 1 -> _add(inst, ip);
             case 2 -> _multiply(inst, ip);
             case 3 -> _in(inst, ip);
+            case 4 -> _out(inst, ip);
             case 5 -> _jump(inst, ip, false );
             case 6 -> _jump(inst, ip, true);
             case 7 -> _le(inst, ip);
             case 8 -> _eq(inst, ip);
             case 9 -> _adjust_rbase(inst, ip);
-            case 4 -> _out(inst, ip);
             case 99 -> -1;
             default -> throw new RuntimeException("invalid opcode");
         };
