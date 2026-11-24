@@ -11,6 +11,7 @@ public class Day5 {
         Scanner scan = new Scanner(System.in);
 
         Computer computer = new Computer(seq, scan);
+        computer.init(null);
         computer.run();
     }
 }

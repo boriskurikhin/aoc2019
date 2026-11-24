@@ -3,6 +3,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
 
@@ -63,24 +64,17 @@ public class Computer implements Runnable {
         this.output_queue = output_queue;
     }
 
-    public void run() {
+    public void init(HashMap<Integer, Long> values) {
         memory = Arrays.copyOf(init, size);
-        int ip = 0;
-
-        try {
-            do { ip = run_command(ip); } while (ip != -1);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } finally {
-            if (output_queue != null)
-                output_queue.add(HALT);
+    
+        if (values != null) {
+            for (Entry<Integer, Long> entry : values.entrySet()) {
+                memory[entry.getKey()] = entry.getValue();
+            }
         }
     }
 
-    public void run(long noun, long verb) {
-        memory = Arrays.copyOf(init, size);
-        memory[1] = noun;
-        memory[2] = verb;
+    public void run() {
         int ip = 0;
 
         try {

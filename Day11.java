@@ -16,9 +16,10 @@ import javax.swing.SwingUtilities;
 
 
 enum Color { BLACK, WHITE }
-record Point (int y, int x) {}
 
 class Robot {
+    record Point (int y, int x) {}
+
     final static int inf = 0x3f3f3f3f;
     int x, y, dx = 0, dy = 1;
     long top, bottom, left, right;
@@ -130,6 +131,7 @@ public class Day11 extends JFrame {
             output_queue
         );
 
+        computer.init(null);
         Thread computer_thread = new Thread(computer);
         computer_thread.start();
 

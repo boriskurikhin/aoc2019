@@ -32,6 +32,7 @@ public class Day7 {
             }
 
             computers[i] = new Computer(program, input_queue, output_queue);
+            computers[i].init(null);
             threads[i] = new Thread(computers[i]);
             threads[i].start();
 
