@@ -15,6 +15,7 @@ public class Computer implements Runnable {
     private static final int size = 10_000;
     private final long[] init;
     private long[] memory;
+    private int ip;
     private Scanner scanner;
 
     public static final long HALT = Long.MIN_VALUE;
@@ -58,15 +59,20 @@ public class Computer implements Runnable {
         this.scanner = scanner;
     }
 
-    public Computer(String instruction, BlockingQueue input_queue, BlockingQueue output_queue) {
+    public Computer(
+        String instruction,
+        BlockingQueue<Long> input_queue,
+        BlockingQueue<Long> output_queue
+    ) {
         this(instruction);
         this.input_queue = input_queue;
         this.output_queue = output_queue;
     }
 
-    public void init(HashMap<Integer, Long> values) {
+    public void init(Map<Integer, Long> values) {
+        ip = rbase = 0;
         memory = Arrays.copyOf(init, size);
-    
+        
         if (values != null) {
             for (Entry<Integer, Long> entry : values.entrySet()) {
                 memory[entry.getKey()] = entry.getValue();
@@ -74,9 +80,17 @@ public class Computer implements Runnable {
         }
     }
 
-    public void run() {
-        int ip = 0;
+    public ComputerState save () {
+        return new ComputerState(memory, ip, rbase);
+    }
 
+    public void restore(ComputerState state) {
+        memory = state.memory().clone();
+        ip = state.ip();
+        rbase = state.rbase();
+    }
+
+    public void run() {
         try {
             do { ip = run_command(ip); } while (ip != -1);
         } catch (InterruptedException e) {
@@ -85,6 +99,17 @@ public class Computer implements Runnable {
             if (output_queue != null)
                 output_queue.add(HALT);
         }
+    }
+
+    public Long runUntilOutput() throws InterruptedException {
+        if (output_queue == null)
+            throw new RuntimeException("No output queue!");
+
+        while (ip != -1 && output_queue.isEmpty()) {
+            ip = run_command(ip);
+        }
+
+        return output_queue.poll();
     }
 
     public long read(int addr) {
